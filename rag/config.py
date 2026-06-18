@@ -2,8 +2,12 @@
 
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 # Project root (parent of the rag/ package)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+load_dotenv(PROJECT_ROOT / ".env")
 
 # Embedding model
 MODEL_NAME = "BAAI/bge-m3"

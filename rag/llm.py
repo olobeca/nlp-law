@@ -3,6 +3,7 @@
 import logging
 import os
 
+import rag.config  # noqa: F401 — ładuje .env
 from groq import Groq
 
 logger = logging.getLogger(__name__)
@@ -36,17 +37,7 @@ def ask_llm(query: str, articles: list[dict]) -> str:
     Returns:
         Odpowiedź LLM jako string.
     """
-    context = "\n\n".join(
-        f"[{article['title']}]\n{article['text']}"
-        for article in articles
-    )
-
-    user_message = (
-        f"Poniżej znajdują się artykuły Kodeksu Pracy dobrane do pytania.\n"
-        f"Przeczytaj je uważnie i odpowiedz na pytanie.\n\n"
-        f"ARTYKUŁY:\n{context}\n\n"
-        f"PYTANIE: {query}"
-    )
+    user_message = _build_user_message(query, articles)
 
     logger.info("Wysyłam zapytanie do LLM (model: %s)...", MODEL)
 
@@ -54,7 +45,7 @@ def ask_llm(query: str, articles: list[dict]) -> str:
         model=MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user",   "content": user_message},
+            {"role": "user", "content": user_message},
         ],
         temperature=0.1,
         max_tokens=1024,
@@ -63,3 +54,39 @@ def ask_llm(query: str, articles: list[dict]) -> str:
     answer = response.choices[0].message.content
     logger.info("Odpowiedź LLM otrzymana (%d znaków).", len(answer))
     return answer
+
+
+def _build_user_message(query: str, articles: list[dict]) -> str:
+    context = "\n\n".join(
+        f"[{article['title']}]\n{article['text']}"
+        for article in articles
+    )
+    return (
+        f"Poniżej znajdują się artykuły Kodeksu Pracy dobrane do pytania.\n"
+        f"Przeczytaj je uważnie i odpowiedz na pytanie.\n\n"
+        f"ARTYKUŁY:\n{context}\n\n"
+        f"PYTANIE: {query}"
+    )
+
+
+def ask_llm_stream(query: str, articles: list[dict]):
+    """Strumieniuje odpowiedź LLM token po tokenie (generator dla Streamlit)."""
+    user_message = _build_user_message(query, articles)
+
+    logger.info("Strumieniuję odpowiedź LLM (model: %s)...", MODEL)
+
+    stream = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_message},
+        ],
+        temperature=0.1,
+        max_tokens=1024,
+        stream=True,
+    )
+
+    for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
