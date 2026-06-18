@@ -21,7 +21,7 @@ from pathlib import Path
 
 PDF_URL  = "https://api.sejm.gov.pl/eli/acts/DU/2025/277/text.pdf"
 PDF_PATH = "kodeks_pracy.pdf"
-OUT_PATH = "kodeks_pracy_artykuly.json"
+OUT_PATH = "articles.json"
 
 # Marker który jednoznacznie wskazuje początek właściwego tekstu KP.
 # Wszystko przed nim to preambuła obwieszczenia — pomijamy.

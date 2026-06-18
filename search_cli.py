@@ -5,12 +5,21 @@ Interactive CLI for semantic search over Kodeks Pracy articles.
 Loads the FAISS index and metadata, then runs a REPL for Polish queries.
 """
 
+#!/usr/bin/env python3
+"""
+Interactive CLI for semantic search over Kodeks Pracy articles.
+
+Loads the FAISS index and metadata, then runs a REPL for Polish queries.
+Po znalezieniu artykułów generuje odpowiedź przez LLM (Groq).
+"""
+
 import logging
 import sys
 
 from rag.config import FAISS_INDEX_PATH, METADATA_PATH, TOP_K
 from rag.embeddings import encode_query, load_model
 from rag.index_store import load_index, load_metadata, search
+from rag.llm import ask_llm
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,13 +47,13 @@ def print_results(
 
 def run_search_loop(index, metadata) -> None:
     """Interactive query loop."""
-    print("\nKodeks Pracy — wyszukiwanie semantyczne")
-    print(f"Zwracane wyniki: TOP {TOP_K}")
+    print("\nKodeks Pracy — asystent prawny (RAG)")
+    print(f"Wyszukiwanie: TOP {TOP_K} artykułów + odpowiedź LLM")
     print("Wpisz zapytanie po polsku lub 'exit' aby zakończyć.\n")
 
     while True:
         try:
-            query = input("Zapytanie (lub 'exit'): ").strip()
+            query = input("Pytanie (lub 'exit'): ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nZakończono.")
             break
@@ -55,17 +64,30 @@ def run_search_loop(index, metadata) -> None:
             print("Do widzenia!")
             break
 
+        # Krok 1: Retrieval — znajdź pasujące artykuły
         query_vector = encode_query(query)
         scores_arr, indices_arr = search(index, query_vector, TOP_K)
 
         scores = scores_arr[0].tolist()
         indices = indices_arr[0].tolist()
+
+        print("\n--- Znalezione artykuły ---")
         print_results(scores, indices, metadata)
+
+        # Krok 2: Generation — wygeneruj odpowiedź na podstawie artykułów
+        top_articles = [metadata[idx] for idx in indices if idx >= 0]
+        answer = ask_llm(query, top_articles)
+
+        print("=" * 50)
+        print("ODPOWIEDŹ ASYSTENTA:")
+        print("=" * 50)
+        print(answer)
+        print()
 
 
 def main() -> None:
     """Load index, metadata, and model; start interactive search."""
-    logger.info("=== Kodeks Pracy: search CLI ===")
+    logger.info("=== Kodeks Pracy: RAG asystent prawny ===")
 
     try:
         index = load_index(FAISS_INDEX_PATH)
