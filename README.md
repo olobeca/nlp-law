@@ -22,6 +22,12 @@ pip install -r requirements.txt
 
 The first indexing run downloads the `BAAI/bge-m3` model (~2 GB) from Hugging Face.
 
+### 3. Add llm key to env
+```bash
+export GROQ_API_KEY="your_api_key_here" # macOS/Linux
+$env:GROQ_API_KEY="your_api_key_here" # Windows
+```
+
 ## Usage
 
 Run the pipeline in order:
@@ -30,7 +36,12 @@ Run the pipeline in order:
 # Step 1: Embed articles and build FAISS index
 python embed_and_index.py
 
-# Step 2: Interactive semantic search (Polish queries)
+# Step 2: Run the application
+
+# Option A: Streamlit Web Interface
+streamlit run app.py
+
+# Option B: Interactive semantic search CLI (Polish queries)
 python search_cli.py
 ```
 
