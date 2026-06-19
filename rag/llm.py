@@ -3,7 +3,7 @@
 import logging
 import os
 
-import rag.config  # noqa: F401 — ładuje .env
+import rag.config
 from groq import Groq
 
 logger = logging.getLogger(__name__)

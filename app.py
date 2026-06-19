@@ -6,12 +6,19 @@ from typing import Dict, List, Optional, Tuple
 
 import streamlit as st
 
-from rag.bm25 import build_bm25, search_bm25
-from rag.config import FAISS_INDEX_PATH, METADATA_PATH, TOP_K
-from rag.embeddings import encode_query, load_model
-from rag.hybrid import hybrid_search
-from rag.index_store import load_index, load_metadata, search as search_faiss
+from rag.bm25 import build_bm25
+from rag.config import (
+    FAISS_INDEX_PATH,
+    METADATA_PATH,
+    RERANKER_CANDIDATES_DEFAULT,
+    RERANKER_ENABLED_DEFAULT,
+    RERANKER_MODELS,
+    TOP_K,
+)
+from rag.embeddings import load_model
+from rag.index_store import load_index, load_metadata
 from rag.llm import MODEL, ask_llm
+from rag.retrieve import retrieve
 
 st.set_page_config(
     page_title="Kodeks Pracy — Asystent RAG",
@@ -77,30 +84,6 @@ def load_resources():
     return index, bm25_model, metadata
 
 
-def retrieve(
-    query: str,
-    mode: str,
-    top_k: int,
-    index,
-    bm25_model,
-    metadata: List[dict],
-) -> List[tuple]:
-    query_vector = encode_query(query)
-
-    if mode == "dense":
-        scores_arr, indices_arr = search_faiss(index, query_vector, top_k)
-        return [
-            (int(idx), float(score))
-            for idx, score in zip(indices_arr[0], scores_arr[0])
-            if idx >= 0
-        ]
-
-    if mode == "bm25":
-        return search_bm25(bm25_model, query, k=top_k)
-
-    return hybrid_search(bm25_model, index, query, query_vector, metadata, k=top_k)
-
-
 def render_sidebar_settings() -> tuple:
     st.header("Nawigacja")
     nav_col1, nav_col2 = st.columns(2)
@@ -123,8 +106,32 @@ def render_sidebar_settings() -> tuple:
     )
     top_k = st.slider("Liczba artykułów (TOP K)", min_value=1, max_value=10, value=TOP_K)
     _sidebar_separator()
+    st.subheader("Reranker")
+    use_reranker = st.checkbox(
+        "Włącz cross-encoder reranker",
+        value=RERANKER_ENABLED_DEFAULT,
+        help="Drugi etap: precyzyjna ocena kandydatów z retrieval.",
+    )
+    rerank_candidates = st.slider(
+        "Kandydaci przed rerankiem",
+        min_value=top_k,
+        max_value=30,
+        value=max(RERANKER_CANDIDATES_DEFAULT, top_k),
+        disabled=not use_reranker,
+        help="Ile artykułów pobiera retrieval, zanim reranker wybierze TOP K.",
+    )
+    reranker_label = st.selectbox(
+        "Model rerankera",
+        options=list(RERANKER_MODELS.keys()),
+        index=0,
+        disabled=not use_reranker,
+    )
+    reranker_model = RERANKER_MODELS[reranker_label]
+    _sidebar_separator()
     st.markdown(f"**Model LLM:** `{MODEL}`")
     st.markdown("**Embeddingi:** `BAAI/bge-m3`")
+    if use_reranker:
+        st.markdown(f"**Reranker:** `{reranker_model}`")
     if st.button("Wyczyść czat"):
         st.session_state.messages = []
         st.experimental_rerun()
@@ -133,7 +140,7 @@ def render_sidebar_settings() -> tuple:
         "To narzędzie informacyjne — nie zastępuje porady prawnej. "
         "Dane artykułów są mockami deweloperskimi."
     )
-    return mode, top_k
+    return mode, top_k, use_reranker, rerank_candidates, reranker_model
 
 
 def render_library_page(metadata: List[dict], by_id: Dict[int, dict]) -> None:
@@ -177,6 +184,7 @@ def render_sources(
     results: List[tuple],
     metadata: List[dict],
     key_prefix: str,
+    reranked: bool = False,
 ) -> None:
     if not results:
         st.warning("Nie znaleziono pasujących artykułów.")
@@ -189,7 +197,8 @@ def render_sources(
             article = metadata[idx]
             col_text, col_btn = st.columns([5, 1])
             with col_text:
-                st.markdown(f"**{rank}. {article['title']}** — score: `{score:.4f}`")
+                score_label = "rerank" if reranked else "score"
+                st.markdown(f"**{rank}. {article['title']}** — {score_label}: `{score:.4f}`")
                 preview = article["text"]
                 if len(preview) > 400:
                     preview = preview[:400] + "..."
@@ -234,7 +243,12 @@ def render_message(
 
         render_article_refs(cited, key_prefix=f"msg_{message_idx}")
         if message.get("sources"):
-            render_sources(message["sources"], metadata, key_prefix=f"msg_{message_idx}")
+            render_sources(
+                message["sources"],
+                metadata,
+                key_prefix=f"msg_{message_idx}",
+                reranked=message.get("reranked", False),
+            )
 
     st.markdown("---")
 
@@ -244,6 +258,9 @@ def render_chat_page(
     by_number: Dict[int, dict],
     mode: str,
     top_k: int,
+    use_reranker: bool,
+    rerank_candidates: int,
+    reranker_model: str,
     index,
     bm25_model,
 ) -> None:
@@ -259,7 +276,17 @@ def render_chat_page(
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         with st.spinner("Szukam artykułów i generuję odpowiedź..."):
-            results = retrieve(prompt, mode, top_k, index, bm25_model, metadata)
+            results = retrieve(
+                prompt,
+                mode,
+                top_k,
+                index,
+                bm25_model,
+                metadata,
+                use_reranker=use_reranker,
+                rerank_candidates=rerank_candidates,
+                reranker_model=reranker_model,
+            )
             top_articles = [
                 metadata[idx] for idx, _ in results if 0 <= idx < len(metadata)
             ]
@@ -270,7 +297,12 @@ def render_chat_page(
                 answer = ask_llm(prompt, top_articles)
 
         st.session_state.messages.append(
-            {"role": "assistant", "content": answer, "sources": results}
+            {
+                "role": "assistant",
+                "content": answer,
+                "sources": results,
+                "reranked": use_reranker,
+            }
         )
         st.experimental_rerun()
 
@@ -302,12 +334,22 @@ def main() -> None:
         st.session_state.messages = []
 
     with st.sidebar:
-        mode, top_k = render_sidebar_settings()
+        mode, top_k, use_reranker, rerank_candidates, reranker_model = render_sidebar_settings()
 
     if st.session_state.page == "library":
         render_library_page(metadata, by_id)
     else:
-        render_chat_page(metadata, by_number, mode, top_k, index, bm25_model)
+        render_chat_page(
+            metadata,
+            by_number,
+            mode,
+            top_k,
+            use_reranker,
+            rerank_candidates,
+            reranker_model,
+            index,
+            bm25_model,
+        )
 
 
 if __name__ == "__main__":
