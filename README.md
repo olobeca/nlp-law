@@ -2,7 +2,7 @@
 
 Local Retrieval-Augmented Generation (RAG) subsystem for Polish Labor Code research. Uses **BAAI/bge-m3** embeddings and **FAISS** for semantic search over Kodeks Pracy articles.
 
-> **Note:** Article texts in `data/articles.json` are fictional mock data for development — not the real Kodeks Pracy.
+> **Note:** Article texts in `data/articles.json` come from the official Kodeks Pracy PDF (API Sejmu). Re-run `embed_and_index.py` after updating the dataset.
 
 ## Setup
 
@@ -50,7 +50,7 @@ nlplaw/
 │   ├── config.py           # Paths, model name, TOP_K
 │   ├── embeddings.py       # BGE-M3 encode helpers
 │   └── index_store.py      # FAISS + metadata I/O
-├── data/articles.json      # Article dataset (30 entries)
+├── data/articles.json      # Article dataset (~474 entries, from PDF parser)
 └── index/
     ├── kp_index.faiss      # FAISS IndexFlatIP (generated)
     └── kp_metadata.json    # Metadata aligned by vector ID (generated)

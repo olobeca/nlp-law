@@ -1,5 +1,3 @@
-"""Ujednolicony pipeline retrieval z opcjonalnym rerankingiem."""
-
 import logging
 from typing import List, Tuple
 
@@ -24,14 +22,6 @@ def retrieve(
     rerank_candidates: int = 15,
     reranker_model: str = None,
 ) -> List[Tuple[int, float]]:
-    """
-    Wyszukaj artykuły wybranym trybem, opcjonalnie z rerankingiem cross-encoder.
-
-    Gdy reranker włączony:
-      1. Pobierz `rerank_candidates` dokumentów (szybki retrieval).
-      2. Cross-encoder ocenia każdą parę (pytanie, artykuł).
-      3. Zwróć `top_k` najlepszych po reranku.
-    """
     fetch_k = rerank_candidates if use_reranker else top_k
     fetch_k = min(fetch_k, len(metadata))
     if fetch_k < 1:

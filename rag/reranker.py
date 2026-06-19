@@ -1,5 +1,3 @@
-"""Cross-encoder reranker — precyzyjna ocena trafności par (pytanie, artykuł)."""
-
 import logging
 from typing import Dict, List, Optional, Tuple
 
@@ -13,7 +11,6 @@ _reranker_cache: Dict[str, CrossEncoder] = {}
 
 
 def load_reranker(model_name: Optional[str] = None) -> CrossEncoder:
-    """Załaduj cross-encoder (cache per nazwa modelu)."""
     name = model_name or RERANKER_MODEL_NAME
     if name not in _reranker_cache:
         logger.info("Ładuję reranker: %s", name)
@@ -36,19 +33,6 @@ def rerank(
     top_k: int,
     model_name: Optional[str] = None,
 ) -> List[Tuple[int, float]]:
-    """
-    Przestawia kandydatów z retrieval wg cross-encodera i zwraca top_k.
-
-    Args:
-        query:      Pytanie użytkownika.
-        results:    Lista (idx_artykułu, score) z BM25 / dense / hybrid.
-        metadata:   Metadane artykułów (indeks = pozycja w FAISS/BM25).
-        top_k:      Liczba wyników końcowych.
-        model_name: Opcjonalna nazwa modelu HuggingFace.
-
-    Returns:
-        Lista (idx_artykułu, rerank_score) posortowana malejąco.
-    """
     if not results:
         return []
 

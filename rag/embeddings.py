@@ -1,5 +1,3 @@
-"""BGE-M3 embedding helpers via sentence-transformers."""
-
 import logging
 from typing import Optional
 
@@ -14,7 +12,6 @@ _model: Optional[SentenceTransformer] = None
 
 
 def load_model() -> SentenceTransformer:
-    """Load the BGE-M3 model once and reuse across calls."""
     global _model
     if _model is None:
         logger.info("Loading embedding model: %s", MODEL_NAME)
@@ -25,11 +22,6 @@ def load_model() -> SentenceTransformer:
 
 
 def encode_documents(texts: list[str]) -> np.ndarray:
-    """
-    Encode document texts into L2-normalized vectors.
-
-    Normalization enables cosine similarity via FAISS IndexFlatIP.
-    """
     model = load_model()
     logger.info("Encoding %d documents...", len(texts))
     vectors = model.encode(
@@ -43,11 +35,6 @@ def encode_documents(texts: list[str]) -> np.ndarray:
 
 
 def encode_query(query: str) -> np.ndarray:
-    """
-    Encode a search query with the BGE retrieval prefix.
-
-    Queries use an instruction prefix (asymmetric retrieval); documents do not.
-    """
     model = load_model()
     prefixed = QUERY_PREFIX + query
     vector = model.encode(

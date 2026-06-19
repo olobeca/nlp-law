@@ -1,10 +1,9 @@
-"""Streamlit chat UI — asystent RAG Kodeks Pracy."""
-
 import os
 import re
 from typing import Dict, List, Optional, Tuple
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from rag.bm25 import build_bm25
 from rag.config import (
@@ -72,6 +71,37 @@ def _extract_cited_articles(text: str, by_number: Dict[int, dict]) -> List[dict]
 def _open_article_in_library(article_id: int) -> None:
     st.session_state.page = "library"
     st.session_state.selected_article_id = article_id
+    st.session_state.scroll_to_article_id = article_id
+    st.session_state.library_search = ""
+
+
+def _scroll_to_article(article_id: int) -> None:
+    anchor = f"article-{article_id}"
+    components.html(
+        f"""
+        <script>
+            (function () {{
+                const anchorId = "{anchor}";
+                function scrollToArticle() {{
+                    const doc = window.parent.document;
+                    const el = doc.getElementById(anchorId);
+                    if (!el) return false;
+                    el.scrollIntoView({{ behavior: "smooth", block: "start" }});
+                    const expander = el.closest('[data-testid="stExpander"]');
+                    if (expander) {{
+                        expander.scrollIntoView({{ behavior: "smooth", block: "start" }});
+                    }}
+                    return true;
+                }}
+                if (!scrollToArticle()) {{
+                    setTimeout(scrollToArticle, 300);
+                    setTimeout(scrollToArticle, 800);
+                }}
+            }})();
+        </script>
+        """,
+        height=0,
+    )
 
 
 @st.experimental_singleton(show_spinner=False)
@@ -138,7 +168,7 @@ def render_sidebar_settings() -> tuple:
     _sidebar_separator()
     st.caption(
         "To narzędzie informacyjne — nie zastępuje porady prawnej. "
-        "Dane artykułów są mockami deweloperskimi."
+        "Artykuły pochodzą z Kodeksu Pracy (parser PDF, API Sejmu)."
     )
     return mode, top_k, use_reranker, rerank_candidates, reranker_model
 
@@ -154,6 +184,8 @@ def render_library_page(metadata: List[dict], by_id: Dict[int, dict]) -> None:
     ).strip().lower()
 
     selected_id = st.session_state.get("selected_article_id")
+    scroll_to_id = st.session_state.pop("scroll_to_article_id", None)
+
     if selected_id and selected_id in by_id:
         st.info(f"Wybrany artykuł: **{by_id[selected_id]['title']}**")
         if st.button("Odznacz artykuł"):
@@ -169,6 +201,11 @@ def render_library_page(metadata: List[dict], by_id: Dict[int, dict]) -> None:
     else:
         articles = sorted_articles
 
+    if selected_id and selected_id in by_id:
+        selected = by_id[selected_id]
+        if not any(a["id"] == selected_id for a in articles):
+            articles = [selected] + articles
+
     if not articles:
         st.warning("Brak artykułów pasujących do wyszukiwania.")
         return
@@ -176,8 +213,15 @@ def render_library_page(metadata: List[dict], by_id: Dict[int, dict]) -> None:
     for article in articles:
         is_selected = article["id"] == selected_id
         label = f"{'▶ ' if is_selected else ''}{article['title']}"
+        st.markdown(
+            f'<div id="article-{article["id"]}" style="scroll-margin-top: 6rem;"></div>',
+            unsafe_allow_html=True,
+        )
         with st.expander(label, expanded=is_selected):
             st.markdown(article["text"])
+
+    if scroll_to_id and scroll_to_id in by_id:
+        _scroll_to_article(scroll_to_id)
 
 
 def render_sources(
@@ -330,6 +374,8 @@ def main() -> None:
         st.session_state.page = "chat"
     if "selected_article_id" not in st.session_state:
         st.session_state.selected_article_id = None
+    if "library_search" not in st.session_state:
+        st.session_state.library_search = ""
     if "messages" not in st.session_state:
         st.session_state.messages = []
 

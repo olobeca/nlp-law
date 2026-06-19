@@ -1,14 +1,4 @@
 #!/usr/bin/env python3
-"""
-Asystent prawny Kodeks Pracy — CLI z wyborem trybu wyszukiwania.
-
-Tryby:
-  1. hybrid  — BM25 + Dense scalony przez RRF (domyślny)
-  2. dense   — tylko FAISS (embeddingi BGE-M3)
-  3. bm25    — tylko BM25 (dopasowanie słów kluczowych)
-
-Reranker (cross-encoder) domyślnie włączony — konfiguracja w rag/config.py.
-"""
 
 import logging
 import sys

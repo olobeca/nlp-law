@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""
-Embed mock Kodeks Pracy articles with BGE-M3 and build a FAISS index.
-
-Reads data/articles.json, generates L2-normalized embeddings, and saves:
-  - index/kp_index.faiss
-  - index/kp_metadata.json
-"""
 
 import json
 import logging
@@ -23,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 def load_articles() -> list[dict]:
-    """Load articles from the mock data file."""
     if not ARTICLES_PATH.exists():
         logger.error(
             "Articles file not found at %s. Add data/articles.json first.",
@@ -39,12 +31,10 @@ def load_articles() -> list[dict]:
 
 
 def build_corpus(articles: list[dict]) -> list[str]:
-    """Combine title and text for richer document embeddings."""
     return [f"{article['title']}\n{article['text']}" for article in articles]
 
 
 def main() -> None:
-    """Load articles, embed, index, and persist."""
     logger.info("=== Kodeks Pracy: embed and index ===")
 
     articles = load_articles()

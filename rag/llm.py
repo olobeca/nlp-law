@@ -1,5 +1,3 @@
-"""Generowanie odpowiedzi przez LLM (Groq) na podstawie artykułów z FAISS."""
-
 import logging
 import os
 
@@ -27,16 +25,6 @@ Zasady:
 
 
 def ask_llm(query: str, articles: list[dict]) -> str:
-    """
-    Wysyła pytanie i pasujące artykuły do LLM, zwraca gotową odpowiedź.
-
-    Args:
-        query:    Pytanie użytkownika.
-        articles: Lista słowników z kluczami 'title' i 'text'.
-
-    Returns:
-        Odpowiedź LLM jako string.
-    """
     user_message = _build_user_message(query, articles)
 
     logger.info("Wysyłam zapytanie do LLM (model: %s)...", MODEL)
@@ -70,7 +58,6 @@ def _build_user_message(query: str, articles: list[dict]) -> str:
 
 
 def ask_llm_stream(query: str, articles: list[dict]):
-    """Strumieniuje odpowiedź LLM token po tokenie (generator dla Streamlit)."""
     user_message = _build_user_message(query, articles)
 
     logger.info("Strumieniuję odpowiedź LLM (model: %s)...", MODEL)
